@@ -1,0 +1,16 @@
+{
+  "name": "langgraph-checkpoint-durable-object-tests",
+  "main": "harness.ts",
+  "compatibility_date": "2026-11-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "traces": {
+      "enabled": true,
+    },
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "CHECKPOINT", "class_name": "CheckpointHarness" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CheckpointHarness"] }],
+}

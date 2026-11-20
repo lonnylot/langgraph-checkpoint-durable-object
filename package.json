@@ -1,0 +1,81 @@
+{
+  "name": "langgraph-checkpoint-durable-object",
+  "version": "0.1.0",
+  "description": "LangGraph.js checkpoint saver backed by Cloudflare Durable Object SQLite storage.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Lonny Kapelushnik",
+  "keywords": [
+    "langgraph",
+    "langchain",
+    "checkpoint",
+    "cloudflare",
+    "durable-objects",
+    "sqlite"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lonnylot/langgraph-checkpoint-durable-object.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lonnylot/langgraph-checkpoint-durable-object/issues"
+  },
+  "homepage": "https://github.com/lonnylot/langgraph-checkpoint-durable-object#readme",
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "types": "wrangler types -c test/wrangler.jsonc test/worker-configuration.d.ts",
+    "pretypecheck": "npm run types",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p test/tsconfig.json --noEmit",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "pretest": "npm run types",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build",
+    "release": "node scripts/publish.mjs",
+    "changeset": "changeset"
+  },
+  "peerDependencies": {
+    "@cloudflare/workers-types": "^5.0.0",
+    "@langchain/core": "^1.1.0",
+    "@langchain/langgraph-checkpoint": "^1.2.0"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.7",
+    "@cloudflare/vitest-plugin": "^1.8.4",
+    "@cloudflare/workers-types": "^5.20261118.1",
+    "@eslint/js": "^9.39.1",
+    "@langchain/core": "^1.1.48",
+    "@langchain/langgraph": "^1.7.5",
+    "@langchain/langgraph-checkpoint": "^1.2.3",
+    "@langchain/langgraph-checkpoint-validation": "^1.2.1",
+    "@types/node": "^22.19.1",
+    "eslint": "^9.39.1",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.48.0",
+    "vitest": "^4.1.4",
+    "wrangler": "^4.50.0"
+  }
+}

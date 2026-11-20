@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.wrangler/
+.turbo/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+test/worker-configuration.d.ts
+.eslintcache
+tsconfig.tsbuildinfo
+test/tsconfig.tsbuildinfo
