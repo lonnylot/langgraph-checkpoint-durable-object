@@ -1,6 +1,15 @@
 import "@langchain/core/callbacks/dispatch";
 import { evictDurableObject, runInDurableObject } from "cloudflare:test";
-import { Annotation, Command, END, interrupt, START, StateGraph } from "@langchain/langgraph";
+import {
+  Command,
+  END,
+  ReducedValue,
+  START,
+  StateGraph,
+  StateSchema,
+  interrupt,
+} from "@langchain/langgraph";
+import { z } from "zod";
 import { INTERRUPT, RESUME, type SerializerProtocol } from "@langchain/langgraph-checkpoint";
 import { describe, expect, it } from "vitest";
 import { CHECKPOINT_SCHEMA_VERSION, DurableObjectCheckpointSaver } from "../src/index.js";
@@ -345,15 +354,9 @@ describe("DurableObjectCheckpointSaver", () => {
 
   it("keeps every channel after a later step writes only one of them", async () => {
     await withSaver(objectName("channels"), async (saver) => {
-      const State = Annotation.Root({
-        title: Annotation<string>({
-          reducer: (_current, next) => next,
-          default: () => "",
-        }),
-        note: Annotation<string>({
-          reducer: (_current, next) => next,
-          default: () => "",
-        }),
+      const State = new StateSchema({
+        title: latestString(),
+        note: latestString(),
       });
       const graph = new StateGraph(State)
         .addNode("setTitle", () => ({ title: "milk" }))
@@ -391,6 +394,12 @@ describe("DurableObjectCheckpointSaver", () => {
   });
 });
 
+function latestString() {
+  return new ReducedValue(z.string().default(""), {
+    reducer: (_current, next) => next,
+  });
+}
+
 function interruptedGraph(saver: DurableObjectCheckpointSaver) {
   return buildInterruptedGraph(saver);
 }
@@ -401,11 +410,8 @@ function interruptValue(state: { answer: string }): unknown {
 }
 
 function buildInterruptedGraph(saver: DurableObjectCheckpointSaver) {
-  const State = Annotation.Root({
-    answer: Annotation<string>({
-      reducer: (_current, next) => next,
-      default: () => "",
-    }),
+  const State = new StateSchema({
+    answer: latestString(),
   });
   return new StateGraph(State)
     .addNode("review", () => {

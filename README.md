@@ -5,7 +5,7 @@ LangGraph.js checkpoint saver for [Cloudflare Durable Object](https://developers
 It implements `BaseCheckpointSaver` from `@langchain/langgraph-checkpoint`: `getTuple`, `list`, `put`, `putWrites`, and `deleteThread`, including metadata filters, `before`, `limit`, checkpoint namespaces, parent checkpoints, and pending writes.
 
 ```bash
-npm install langgraph-checkpoint-durable-object @langchain/langgraph @langchain/langgraph-checkpoint @langchain/core
+npm install langgraph-checkpoint-durable-object @langchain/langgraph @langchain/langgraph-checkpoint @langchain/core zod
 ```
 
 Peer dependencies:
@@ -50,12 +50,20 @@ The Durable Object class must use SQLite storage (`new_sqlite_classes` in the Wr
 Compile the graph with that saver and pass a `thread_id`:
 
 ```typescript
-import { Annotation, END, START, StateGraph, interrupt, Command } from "@langchain/langgraph";
+import {
+  Command,
+  END,
+  ReducedValue,
+  START,
+  StateGraph,
+  StateSchema,
+  interrupt,
+} from "@langchain/langgraph";
+import { z } from "zod";
 
-const State = Annotation.Root({
-  answer: Annotation<string>({
+const State = new StateSchema({
+  answer: new ReducedValue(z.string().default(""), {
     reducer: (_current, next) => next,
-    default: () => "",
   }),
 });
 
