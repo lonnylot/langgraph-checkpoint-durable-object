@@ -195,7 +195,7 @@ Tests run in the Workers runtime through [`@cloudflare/vitest-plugin`](https://d
 
 ## Releasing
 
-Releases are published from GitHub Actions with [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/). The workflow is `.github/workflows/release.yml`. It requests `id-token: write` and does not use an npm token. Provenance is attached automatically for this public package. The order of the first publish, the npmjs.com trusted-publisher fields, and later Changesets releases are in [RELEASING.md](RELEASING.md).
+`0.1.0` is published once from a local checkout. Later versions are published from GitHub Actions with [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/). The workflow is `.github/workflows/release.yml`. It requests `id-token: write` and does not use an npm token. Provenance is attached automatically for this public package. The order, including why not to stage-reject a new package, is in [RELEASING.md](RELEASING.md).
 
 Protect `main` with a pull-request requirement so releases only move through reviewed commits. This repository does not enable that setting by itself.
 

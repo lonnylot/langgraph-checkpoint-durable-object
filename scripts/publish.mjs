@@ -31,4 +31,21 @@ try {
 
 // Trusted publishing from GitHub Actions attaches provenance for a public
 // package built from a public repository. Do not pass --provenance.
-execSync("npm publish --access public", { stdio: "inherit" });
+try {
+  execSync("npm publish --access public", { stdio: "inherit" });
+} catch (error) {
+  const output = errorText(error);
+  if (/previously published|EPUBLISHCONFLICT|cannot publish over/i.test(output)) {
+    console.log(`${name}@${version} is already on npm.`);
+    process.exit(0);
+  }
+  console.error(output);
+  process.exit(1);
+}
+
+function errorText(error) {
+  if (typeof error !== "object" || error === null) return String(error);
+  const stderr = "stderr" in error && typeof error.stderr === "string" ? error.stderr : "";
+  const message = "message" in error && typeof error.message === "string" ? error.message : "";
+  return `${stderr}\n${message}`;
+}

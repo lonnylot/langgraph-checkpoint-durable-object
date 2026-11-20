@@ -27,5 +27,3 @@ jobs:
           publish: node scripts/publish.mjs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish this version when it is not on npm yet
-        run: node scripts/publish.mjs
