@@ -13,7 +13,6 @@ import {
   type CheckpointMetadata,
   type CheckpointTuple,
   type PendingWrite,
-  type SerializerProtocol,
 } from "@langchain/langgraph-checkpoint";
 import { toBytes } from "./bytes.js";
 import { dumpTyped, loadTyped } from "./serde.js";
@@ -86,10 +85,9 @@ export class DurableObjectCheckpointSaver extends BaseCheckpointSaver {
     if (!threadId) return undefined;
     const checkpointNs = optionalString(configurable.checkpoint_ns) ?? "";
     const checkpointId = optionalString(configurable.checkpoint_id);
-    const chain = this.#repo.lineage(threadId, checkpointNs, checkpointId);
-    const row = chain[0];
+    const row = this.#repo.getCheckpoint(threadId, checkpointNs, checkpointId);
     if (!row) return undefined;
-    return this.#tupleFrom(row, chain, config, checkpointId !== undefined);
+    return this.#tupleFrom(row, config, checkpointId !== undefined);
   }
 
   override async *list(
@@ -108,13 +106,8 @@ export class DurableObjectCheckpointSaver extends BaseCheckpointSaver {
       metadata: metadataFilters(options?.filter),
       ...(limit !== undefined ? { limit: sanitizeLimit(limit) } : {}),
     });
-    const chains = records.map((record) =>
-      this.#repo.lineage(record.threadId, record.checkpointNs, record.checkpointId),
-    );
-    for (const chain of chains) {
-      const row = chain[0];
-      if (!row) continue;
-      yield await this.#tupleFrom(row, chain, config, false);
+    for (const record of records) {
+      yield await this.#tupleFrom(record, config, false);
     }
   }
 
@@ -131,7 +124,7 @@ export class DurableObjectCheckpointSaver extends BaseCheckpointSaver {
       configurable.checkpoint_id == null
         ? null
         : (textIfPresent(configurable.checkpoint_id) ?? null);
-    const prepared = checkpointForVersions(checkpoint, _newVersions);
+    const prepared = copyCheckpoint(checkpoint);
     const [[checkpointType, serializedCheckpoint], [metadataType, serializedMetadata]] =
       await Promise.all([dumpTyped(this.serde, prepared), dumpTyped(this.serde, metadata)]);
     if (checkpointType !== metadataType) {
@@ -203,7 +196,6 @@ export class DurableObjectCheckpointSaver extends BaseCheckpointSaver {
 
   async #tupleFrom(
     row: CheckpointRecord,
-    chain: readonly CheckpointRecord[],
     requested: RunnableConfig,
     hadCheckpointId: boolean,
   ): Promise<CheckpointTuple> {
@@ -213,7 +205,9 @@ export class DurableObjectCheckpointSaver extends BaseCheckpointSaver {
         return [write.taskId, write.channel, loaded] as [string, string, unknown];
       }),
     );
-    const checkpoint = await mergedCheckpoint(this.serde, chain);
+    const checkpoint = asCheckpoint(
+      await loadTyped(this.serde, row.type ?? "json", row.checkpoint),
+    );
     if (checkpoint.v < 4 && row.parentCheckpointId != null) {
       await this.#migratePendingSends(
         checkpoint,
@@ -263,43 +257,6 @@ export class DurableObjectCheckpointSaver extends BaseCheckpointSaver {
     checkpoint.channel_versions[TASKS] =
       versions.length > 0 ? maxChannelVersion(...versions) : this.getNextVersion(undefined);
   }
-}
-
-/**
- * `newVersions` names the channels written in this superstep. Only those
- * values are stored. `getTuple` and `list` copy any missing channel from
- * the parent chain, which is how a later step keeps channels it did not write.
- */
-function checkpointForVersions(checkpoint: Checkpoint, newVersions: ChannelVersions): Checkpoint {
-  const prepared = copyCheckpoint(checkpoint);
-  const changed = new Set(Object.keys(newVersions));
-  const values: Checkpoint["channel_values"] = {};
-  for (const [key, value] of Object.entries(prepared.channel_values)) {
-    if (changed.has(key)) values[key] = value;
-  }
-  prepared.channel_values = values;
-  return prepared;
-}
-
-async function mergedCheckpoint(
-  serde: SerializerProtocol,
-  chain: readonly CheckpointRecord[],
-): Promise<Checkpoint> {
-  const loaded = await Promise.all(
-    chain.map(async (record) =>
-      asCheckpoint(await loadTyped(serde, record.type ?? "json", record.checkpoint)),
-    ),
-  );
-  const head = loaded[0];
-  if (!head) throw new Error("Checkpoint chain was empty.");
-  const merged: Checkpoint["channel_values"] = { ...head.channel_values };
-  for (const ancestor of loaded.slice(1)) {
-    for (const [key, value] of Object.entries(ancestor.channel_values)) {
-      if (!Object.hasOwn(merged, key)) merged[key] = value;
-    }
-  }
-  head.channel_values = merged;
-  return head;
 }
 
 function sortWrites(writes: readonly WriteRecord[]): WriteRecord[] {

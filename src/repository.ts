@@ -103,30 +103,6 @@ export class CheckpointRepository {
     private readonly inlineByteLimit: number,
   ) {}
 
-  /**
-   * The checkpoint and its parents, nearest first. Loaded with synchronous
-   * queries so the chain is one snapshot.
-   */
-  lineage(
-    threadId: string,
-    checkpointNs: string,
-    checkpointId: string | undefined,
-  ): CheckpointRecord[] {
-    const first = this.getCheckpoint(threadId, checkpointNs, checkpointId);
-    if (!first) return [];
-    const chain = [first];
-    const seen = new Set([first.checkpointId]);
-    let parentId = first.parentCheckpointId;
-    while (parentId != null && !seen.has(parentId)) {
-      seen.add(parentId);
-      const parent = this.getCheckpoint(threadId, checkpointNs, parentId);
-      if (!parent) break;
-      chain.push(parent);
-      parentId = parent.parentCheckpointId;
-    }
-    return chain;
-  }
-
   getCheckpoint(
     threadId: string,
     checkpointNs: string,

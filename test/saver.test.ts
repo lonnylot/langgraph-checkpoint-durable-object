@@ -10,7 +10,13 @@ import {
   interrupt,
 } from "@langchain/langgraph";
 import { z } from "zod";
-import { INTERRUPT, RESUME, type SerializerProtocol } from "@langchain/langgraph-checkpoint";
+import {
+  INTERRUPT,
+  MemorySaver,
+  RESUME,
+  type BaseCheckpointSaver,
+  type SerializerProtocol,
+} from "@langchain/langgraph-checkpoint";
 import { describe, expect, it } from "vitest";
 import { CHECKPOINT_SCHEMA_VERSION, DurableObjectCheckpointSaver } from "../src/index.js";
 import {
@@ -371,6 +377,75 @@ describe("DurableObjectCheckpointSaver", () => {
     });
   });
 
+  it("stores every channel LangGraph passed in and does not copy parent channels onto a later checkpoint", async () => {
+    await withSaver(objectName("exact"), async (saver) => {
+      const parentId = nextId(1);
+      const childId = nextId(2);
+      await saver.put(
+        config("exact"),
+        checkpoint(parentId, { messages: ["hi"], step: 1 }),
+        metadata(),
+        { messages: 1, step: 1 },
+      );
+      await saver.put(config("exact", "", parentId), checkpoint(childId, { step: 2 }), metadata(), {
+        step: 1,
+      });
+      const loaded = await saver.getTuple(config("exact"));
+      expect(loaded?.checkpoint.channel_values).toEqual({ step: 2 });
+      const fullId = nextId(3);
+      await saver.put(
+        config("exact-full"),
+        checkpoint(fullId, { kept: true, also: 1 }),
+        metadata(),
+        {},
+      );
+      expect((await saver.getTuple(config("exact-full")))?.checkpoint.channel_values).toEqual({
+        kept: true,
+        also: 1,
+      });
+    });
+  });
+
+  it("reads a checkpoint stored as text, without filling channels from its parent", async () => {
+    await withSaver(objectName("legacy-text"), async (saver, state) => {
+      const parentId = nextId(1);
+      const childId = nextId(2);
+      await saver.put(
+        config("legacy"),
+        checkpoint(parentId, { "branch:to:model": "old", kept: false }),
+        metadata(),
+        { "branch:to:model": 1, kept: 1 },
+      );
+      const stored = checkpoint(childId, { kept: true });
+      const [checkpointType, checkpointBytes] = await saver.serde.dumpsTyped(stored);
+      const [metadataType, metadataBytes] = await saver.serde.dumpsTyped(metadata());
+      state.storage.sql.exec(
+        `INSERT INTO lg_checkpoints
+          (thread_id, checkpoint_ns, checkpoint_id, parent_checkpoint_id, type, checkpoint, metadata)
+         VALUES ('legacy', '', ?, ?, ?, ?, ?)`,
+        childId,
+        parentId,
+        checkpointType,
+        new TextDecoder().decode(checkpointBytes),
+        new TextDecoder().decode(metadataBytes),
+      );
+      const loaded = await saver.getTuple(config("legacy", "", childId));
+      expect(metadataType).toBe(checkpointType);
+      expect(loaded?.checkpoint.channel_values).toEqual({ kept: true });
+      expect(loaded?.parentConfig?.configurable?.checkpoint_id).toBe(parentId);
+    });
+  });
+
+  it("matches MemorySaver after a parallel interrupt and does not rerun finished branches", async () => {
+    await withSaver(objectName("parallel"), async (saver) => {
+      const saved = await runParallelInterrupt(saver);
+      const memory = await runParallelInterrupt(new MemorySaver());
+      expect(saved.next).toEqual(memory.next);
+      expect(saved.resumed).toEqual(memory.resumed);
+      expect(saved.resumed).toEqual(["confirm"]);
+    });
+  });
+
   it("resumes an interrupted graph after the object is evicted", async () => {
     const name = objectName("graph");
     const thread = stub(name);
@@ -393,6 +468,50 @@ describe("DurableObjectCheckpointSaver", () => {
     });
   });
 });
+
+async function runParallelInterrupt(checkpointer: BaseCheckpointSaver): Promise<{
+  next: string[];
+  resumed: string[];
+}> {
+  const ran: string[] = [];
+  const State = new StateSchema({
+    left: latestString(),
+    right: latestString(),
+    decision: latestString(),
+  });
+  const graph = new StateGraph(State)
+    .addNode("branchLeft", () => {
+      ran.push("branchLeft");
+      return { left: "L" };
+    })
+    .addNode("branchRight", () => {
+      ran.push("branchRight");
+      return { right: "R" };
+    })
+    .addNode("join", () => {
+      ran.push("join");
+      return {};
+    })
+    .addNode("confirm", () => {
+      ran.push("confirm");
+      const answer: unknown = interrupt("approve?");
+      return { decision: typeof answer === "string" ? answer : "" };
+    })
+    .addEdge(START, "branchLeft")
+    .addEdge(START, "branchRight")
+    .addEdge("branchLeft", "join")
+    .addEdge("branchRight", "join")
+    .addEdge("join", "confirm")
+    .addEdge("confirm", END)
+    .compile({ checkpointer });
+  const threadId = `parallel-${crypto.randomUUID()}`;
+  const threadConfig = config(threadId);
+  await graph.invoke({ left: "", right: "", decision: "" }, threadConfig);
+  const snapshot = await graph.getState(threadConfig);
+  ran.length = 0;
+  await graph.invoke(new Command({ resume: "yes" }), threadConfig);
+  return { next: [...snapshot.next], resumed: [...ran] };
+}
 
 function latestString() {
   return new ReducedValue(z.string().default(""), {
