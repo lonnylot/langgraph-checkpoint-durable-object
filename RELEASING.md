@@ -26,9 +26,7 @@ Do these in order. Sign in with `npm login` on the account that will own the pac
    npm publish --access public
    ```
 
-   npm prompts for 2FA. This publish is what creates the package page. It is not done by GitHub Actions, and it does not use trusted publishing.
-
-   Changesets still runs the publish script on a push to `main` when no changeset files are left. The script checks the registry first. If this package is not on npm yet, or if `0.1.0` is already there, it exits without publishing. Merging to `main` after the local `0.1.0` publish does not publish that version again.
+   npm prompts for 2FA. This publish is what creates the package page. It is not done by GitHub Actions, and it does not use trusted publishing. The Release workflow does not publish `0.1.0` again. On a push to `main` that does not come from a Changesets version bump, Changesets finds no unpublished changesets and does nothing.
 
 2. On npmjs.com, open `langgraph-checkpoint-durable-object` → **Settings** → **Trusted Publisher**. Choose **GitHub Actions** and enter:
 

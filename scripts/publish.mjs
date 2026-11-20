@@ -1,11 +1,6 @@
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-// setup-node can inject a registry token when registry-url is set. Trusted
-// publishing must use the GitHub OIDC token instead.
-delete process.env.NODE_AUTH_TOKEN;
-delete process.env.NPM_TOKEN;
-
 const npmVersion = execSync("npm --version", { encoding: "utf8" }).trim();
 const [major = 0, minor = 0, patch = 0] = npmVersion.split(".").map((part) => Number(part));
 const supportsTrustedPublishing =
@@ -21,14 +16,17 @@ const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.
 const name = manifest.name;
 const version = manifest.version;
 
-if (view(name) === null) {
-  console.log(`${name} is not on npm. Publish the first version from a local checkout. Skipping.`);
-  process.exit(0);
-}
-
-if (view(`${name}@${version}`) === version) {
-  console.log(`${name}@${version} is already on npm.`);
-  process.exit(0);
+try {
+  const published = execSync(`npm view ${name}@${version} version`, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim();
+  if (published === version) {
+    console.log(`${name}@${version} is already on npm.`);
+    process.exit(0);
+  }
+} catch {
+  // npm view exits non-zero when that version is not in the registry.
 }
 
 // Trusted publishing from GitHub Actions attaches provenance for a public
@@ -43,20 +41,6 @@ try {
   }
   console.error(output);
   process.exit(1);
-}
-
-function view(spec) {
-  try {
-    return execSync(`npm view ${spec} version`, {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    }).trim();
-  } catch (error) {
-    const output = errorText(error);
-    if (/E404|404 Not Found|not found/i.test(output)) return null;
-    console.error(output);
-    process.exit(1);
-  }
 }
 
 function errorText(error) {

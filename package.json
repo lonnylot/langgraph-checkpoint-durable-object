@@ -51,6 +51,7 @@
     "format": "prettier --write .",
     "pretest": "npm run types",
     "test": "vitest run",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run build",
     "release": "node scripts/publish.mjs",
     "changeset": "changeset"
