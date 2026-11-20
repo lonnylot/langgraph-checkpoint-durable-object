@@ -187,12 +187,7 @@ Tests run in the Workers runtime through [`@cloudflare/vitest-plugin`](https://d
 
 ## Releasing
 
-Publishing is not done from this repository until a maintainer adds the `NPM_TOKEN` secret (an npm granular access token with publish permission for this package). The Release workflow then:
-
-- publishes the current version with npm provenance if that version is not on npm yet
-- runs [Changesets](https://github.com/changesets/changesets) so later version bumps open a "Version Packages" pull request and publish from `main`
-
-Do not commit tokens. Provenance uses GitHub's OIDC `id-token` permission together with `NPM_TOKEN`.
+Releases are published from GitHub Actions with [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/). The workflow is `.github/workflows/release.yml`. It requests `id-token: write` and does not use an npm token. Provenance is attached automatically for this public package. The order of the first publish, the npmjs.com trusted-publisher fields, and later Changesets releases are in [RELEASING.md](RELEASING.md).
 
 Protect `main` with a pull-request requirement so releases only move through reviewed commits. This repository does not enable that setting by itself.
 

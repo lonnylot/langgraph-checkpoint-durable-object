@@ -32,7 +32,7 @@ Lint is ESLint plus Prettier. `npm run format` writes Prettier's changes.
 - Keep serde calls out of `transactionSync`. Await serialization, then do every write for that call in one synchronous transaction. The concurrency notes in the README describe the guarantee.
 - Schema changes are additive and idempotent. Bump `CHECKPOINT_SCHEMA_VERSION` and add a step that existing databases can run more than once.
 - Do not add product-specific table names, thread layouts, or business logic. This package is a generic LangGraph saver.
-- Add a changeset for user-visible changes: `npx changeset`.
+- Add a changeset for user-visible changes: `npx changeset`. Publishing that changeset is described in [RELEASING.md](RELEASING.md).
 
 ## Tests
 
