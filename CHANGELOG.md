@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+### Patch Changes
+
+- 84062af: Fix release publishing so a version npm has already published is treated as done, and a version that is only staged fails with the steps to approve it.
+
 ## 0.1.0
 
 Initial release of `DurableObjectCheckpointSaver`, a LangGraph.js `BaseCheckpointSaver` on Cloudflare Durable Object SQLite storage.
